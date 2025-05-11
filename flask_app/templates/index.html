@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Downscaling Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- 自訂樣式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        /* 箭頭圖示樣式 */
+        .arrow-icon div {
+            font-size: 12px;
+            color: #000;
+            text-shadow: 0 0 2px #fff;
+            pointer-events: none;
+        }
+
+        /* loading 提示樣式 */
+        #loadingMessage {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 導覽列 -->
+    <div class="navbar">
+        <h1>風場降尺度</h1>
+        <div class="nav-right">
+            <!-- 模式切換 -->
+            <div class="mode-switcher">
+                <div id="modeWind" class="mode-btn active">風場</div>
+                <div id="modeRain" class="mode-btn">降水</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 地圖 -->
+        <div id="map"></div>
+
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <h2>選擇參數 / 時間</h2>
+
+            <!-- 變量 -->
+            <label>變量:
+                <select id="selVar">
+                    <option>未選擇</option>
+                    <option value="u10">u10</option>
+                    <option value="v10">v10</option>
+                    <option value="speed">風速</option>
+                </select>
+            </label><br>
+
+            <!-- 年 -->
+            <label>年:
+                <select id="selYear">
+                    <option>未選擇</option>
+                    {% for y in [2018,2019,2020,2021,2022,2023] %}
+                    <option>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </label><br>
+
+            <!-- 月 -->
+            <label>月:
+                <select id="selMonth">
+                    <option>未選擇</option>
+                    {% for m in range(1,13) %}
+                    <option>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </label><br>
+
+            <!-- 日 -->
+            <label>日:
+                <select id="selDay">
+                    <option>未選擇</option>
+                    {% for d in range(1,32) %}
+                    <option>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </label><br>
+
+            <!-- 時 -->
+            <label>時:
+                <select id="selHour">
+                    <option>未選擇</option>
+                    {% for h in range(0,24) %}
+                    <option>{{ h }}</option>
+                    {% endfor %}
+                </select>
+            </label><br>
+
+            <!-- 按鈕 -->
+            <div style="margin-top:5px;">
+                <button id="showCoarseBtn">原始 (0.25°)</button>
+                <button id="showDownBtn">降尺度 (0.02°)</button>
+                <button id="showFineBtn">顯示細網格</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 動態色條 -->
+    <div class="colorbar">
+        <div class="colorbar-title">風速 (m/s)</div>
+        <div class="colorbar-gradient"></div>
+        <div class="colorbar-labels"></div>
+    </div>
+    <style>
+        .colorbar {
+            display: none;
+        }
+    </style>
+
+    <!-- loading 提示 -->
+    <div id="loadingMessage" style="display:none;"></div>
+
+
+    <!-- Leaflet JS -->
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 全域箭頭層
+        let arrowLayer = null;
+
+        // 產生風向箭頭
+        function generateArrowLayer(geojsonLayer) {
+            // 先移除舊的
+            if (arrowLayer) {
+                map.removeLayer(arrowLayer);
+                arrowLayer = null;
+            }
+            arrowLayer = L.layerGroup();
+
+            const features = geojsonLayer.toGeoJSON().features;
+            const total = features.length;
+            const dim = Math.sqrt(total) | 0;
+            const maxArrows = 500;
+
+            // 均勻抽樣步長
+            const step = Math.max(1, Math.round(dim / Math.sqrt(maxArrows)));
+
+            // 1) 預先計算所有格點的風速，用於後續正規化
+            const speeds = features.map(f => {
+                const u = f.properties.raw_u, v = f.properties.raw_v;
+                return Math.sqrt(u * u + v * v);
+            });
+            const maxSpeed = Math.max(...speeds) || 1;
+
+            // 2) 以 step 抽樣
+            for (let row = 0; row < dim; row += step) {
+                for (let col = 0; col < dim; col += step) {
+                    const idx = row * dim + col;
+                    if (idx >= total) continue;
+                    const f = features[idx];
+
+                    // 算格點中心
+                    const coords = f.geometry.coordinates[0];
+                    let lon = 0, lat = 0;
+                    coords.forEach(c => { lon += c[0]; lat += c[1]; });
+                    lon /= coords.length; lat /= coords.length;
+
+                    // 風速 & 風向
+                    const u = f.properties.raw_u, v = f.properties.raw_v;
+                    const speed = Math.sqrt(u * u + v * v);
+                    // 箭頭指向「風的去向」，再 +180 轉成「風的來向」
+                    const dir = (Math.atan2(v, u) * 180 / Math.PI + 180) % 360;
+
+                    // 按風速正規化箭頭大小 (10px ~ 20px)
+                    const size = 10 + (speed / maxSpeed) * 10;
+                    // 也可以用速度決定透明度
+                    const opacity = 0.5 + 0.5 * (speed / maxSpeed);
+
+                    const icon = L.divIcon({
+                        className: 'arrow-icon',
+                        html: `<div style="
+                    transform:rotate(${dir}deg);
+                    font-size:${size}px;
+                    opacity:${opacity.toFixed(2)};
+                ">➤</div>`,
+                        iconSize: [size, size]
+                    });
+
+                    arrowLayer.addLayer(L.marker([lat, lon], { icon }));
+                }
+            }
+
+            arrowLayer.addTo(map);
+        }
+
+
+
+
+        // 1. 初始化地圖
+        const map = L.map('map').setView([23.5, 121], 7);
+        const baseLayer = L.tileLayer(
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            { attribution: '© OpenStreetMap' }
+        ).addTo(map);
+        map.removeControl(map.zoomControl);
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
+
+        // 2. 疊圖控制
+        const layerControl = L.control.layers({ "底圖": baseLayer }, {}).addTo(map);
+        const overlayLayers = {}, layerStats = {};
+
+        // **2.5. 互斥 checkbox：點一個就取消其他，並只在地圖上顯示該層**
+        (function () {
+            const container = layerControl.getContainer();
+            // 監聽 overlays 區塊的 checkbox 變化
+            container.querySelector('.leaflet-control-layers-overlays')
+                .addEventListener('change', e => {
+                    const input = e.target;
+                    if (input.tagName !== 'INPUT' || input.type !== 'checkbox') return;
+                    // 先移除所有 overlay
+                    Object.values(overlayLayers).forEach(layer => {
+                        if (map.hasLayer(layer)) map.removeLayer(layer);
+                    });
+                    // 再取消其他 checkbox
+                    container.querySelectorAll('.leaflet-control-layers-overlays input[type="checkbox"]')
+                        .forEach(i => {
+                            if (i !== input) i.checked = false;
+                        });
+                    // 最後，如果這個剛被打勾，就把對應的 layer 加回地圖
+                    if (input.checked) {
+                        const label = input.nextSibling.textContent.trim();
+                        const layer = overlayLayers[label];
+                        if (layer) map.addLayer(layer);
+                    }
+                    // 如果全部都取消，就啥都不做，底圖保留
+                });
+        })();
+
+        // 3. 紅框範圍
+        // const latMin = 21.75, latMax = 25.5, lonMin = 119, lonMax = 122.75;
+        const latMin = 21.625, latMax = 25.625, lonMin = 118.875, lonMax = 122.875;
+        const outer = [[-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]];
+        const hole = [[latMax, lonMax], [latMax, lonMin], [latMin, lonMin], [latMin, lonMax], [latMax, lonMax]];
+        L.polygon([outer, hole], { fillColor: 'black', fillOpacity: 0.4, stroke: false }).addTo(map);
+        L.rectangle([[latMin, lonMin], [latMax, lonMax]], { color: 'red', weight: 2, fillOpacity: 0 }).addTo(map);
+        map.fitBounds([[latMin, lonMin], [latMax, lonMax]]);
+
+        // 4. 模式切換
+        document.getElementById('modeWind').onclick = () => window.location.href = "/";
+        document.getElementById('modeRain').onclick = () => window.location.href = "/rain";
+
+        // 5. 動態更新日
+        document.getElementById('selYear').addEventListener('change', updateDays);
+        document.getElementById('selMonth').addEventListener('change', updateDays);
+        function updateDays() {
+            const Y = parseInt(selYear.value), M = parseInt(selMonth.value);
+            if (isNaN(Y) || isNaN(M)) { selDay.innerHTML = '<option>未選擇</option>'; return; }
+            let last = new Date(Y, M, 0).getDate(), opts = '<option>未選擇</option>';
+            for (let d = 1; d <= last; d++) opts += `<option>${d}</option>`;
+            selDay.innerHTML = opts;
+        }
+
+        // 6. 參數檢查
+        function getParams() {
+            const v = selVar.value, Y = selYear.value, M = selMonth.value, D = selDay.value, H = selHour.value;
+            if ([v, Y, M, D, H].includes("未選擇")) {
+                alert('請先選完「變量 / 年 / 月 / 日 / 時」');
+                return null;
+            }
+            return { var: v, year: Y, month: M, day: D, hour: H };
+        }
+
+        // 7. 顏色插值
+        function interpolateColor(c1, c2, t) {
+            const hex = x => parseInt(x, 16);
+            let r1 = hex(c1.substr(1, 2)), g1 = hex(c1.substr(3, 2)), b1 = hex(c1.substr(5, 2)),
+                r2 = hex(c2.substr(1, 2)), g2 = hex(c2.substr(3, 2)), b2 = hex(c2.substr(5, 2)),
+                r = Math.round(r1 + (r2 - r1) * t).toString(16).padStart(2, '0'),
+                g = Math.round(g1 + (g2 - g1) * t).toString(16).padStart(2, '0'),
+                b = Math.round(b1 + (b2 - b1) * t).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+        }
+        function makeColorMapper(min, max) {
+            return v => {
+                if (v == null) return '#ffffff';
+                let t = (v - min) / (max - min); t = Math.max(0, Math.min(1, t));
+                return interpolateColor('#ffffff', '#00008b', t);
+            };
+        }
+
+        function updateColorbar(min, max) {
+            document.querySelector('.colorbar-gradient').style.background =
+                'linear-gradient(to right,#ffffff 0%,#00008b 100%)';
+            const mid = (min + max) / 2;
+            document.querySelector('.colorbar-labels').innerHTML =
+                `<span>${min.toFixed(2)}</span><span>${mid.toFixed(2)}</span><span>${max.toFixed(2)}</span>`;
+            document.querySelector('.colorbar').style.display = 'block';
+        }
+
+        // 8. 監聽 overlay add/remove (colourbar & arrow)
+        map.on('overlayadd', e => {
+            const id = L.stamp(e.layer);
+            updateColorbar(layerStats[id].min, layerStats[id].max);
+            generateArrowLayer(e.layer);
+        });
+        map.on('overlayremove', e => {
+            const any = Object.values(overlayLayers).some(l => map.hasLayer(l));
+            if (!any) {
+                document.querySelector('.colorbar').style.display = 'none';
+                if (arrowLayer) { map.removeLayer(arrowLayer); arrowLayer = null; }
+            }
+        });
+
+        // addLayerToMap：繪製格網＋更新色條＋生成箭頭
+        function addLayerToMap(geojsonData, name) {
+
+            Object.values(overlayLayers).forEach(layer => {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            });
+            // 如果已存在，先從 control 移除
+            if (overlayLayers[name]) {
+                map.removeLayer(overlayLayers[name]);
+                layerControl.removeLayer(overlayLayers[name]);
+            }
+            if (arrowLayer) { map.removeLayer(arrowLayer); arrowLayer = null; }
+
+            // 計算 min/max
+            const vals = geojsonData.features.map(f => f.properties.value)
+                .filter(v => v != null);
+            const minVal = 0, maxVal = Math.max(...vals), colorOf = makeColorMapper(minVal, maxVal);
+
+            // 建圖層
+            const layer = L.geoJSON(geojsonData, {
+                style: f => ({
+                    color: colorOf(f.properties.value),
+                    fillColor: colorOf(f.properties.value),
+                    weight: 1, fillOpacity: 0.7
+                })
+            });
+            overlayLayers[name] = layer;
+            layerStats[L.stamp(layer)] = { min: minVal, max: maxVal };
+            layerControl.addOverlay(layer, name);
+
+            // 直接加到地圖上
+            layer.addTo(map);
+            map.fitBounds(layer.getBounds());
+
+            // 更新色條 & 箭頭
+            updateColorbar(minVal, maxVal);
+            generateArrowLayer(layer);
+
+            // 同步 overlay 控制面板的勾選：只勾當前這個 name
+            const container = layerControl.getContainer();
+            const overlaysList = container.querySelector('.leaflet-control-layers-overlays');
+            overlaysList.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                const label = input.nextSibling.textContent.trim();
+                // 如果 label 跟我們剛加入的 name 一樣，就打勾；否則取消勾選
+                input.checked = (label === name);
+            });
+        }
+
+        // 顯示 loading
+        function showLoading(text) {
+            const loading = document.getElementById('loadingMessage');
+            loading.textContent = text;
+            loading.style.display = 'block';
+        }
+
+        // 隱藏 loading
+        function hideLoading() {
+            document.getElementById('loadingMessage').style.display = 'none';
+        }
+
+
+        // 10. 按鈕綁定
+        function bindButton(id, endpoint, labelTpl, loadingText) {
+            document.getElementById(id).onclick = () => {
+                const p = getParams(); if (!p) return;
+                const loading = document.getElementById('loadingMessage'); loading.style.display = 'block';
+                showLoading(loadingText);
+                if (p.var === 'speed') {
+                    Promise.all([
+                        fetch(`${endpoint}?var=u10&year=${p.year}&month=${p.month}&day=${p.day}&hour=${p.hour}`).then(r => r.json()),
+                        fetch(`${endpoint}?var=v10&year=${p.year}&month=${p.month}&day=${p.day}&hour=${p.hour}`).then(r => r.json())
+                    ]).then(([uData, vData]) => {
+                        const merged = { features: uData.features.map((f, i) => ({ type: 'Feature', geometry: f.geometry, properties: { raw_u: f.properties.value, raw_v: vData.features[i].properties.value, value: Math.sqrt(Math.pow(f.properties.value, 2) + Math.pow(vData.features[i].properties.value, 2)) } })) };
+                        addLayerToMap(merged, labelTpl.replace('{var}', p.var).replace('{year}', p.year).replace('{month}', p.month).replace('{day}', p.day).replace('{hour}', p.hour));
+                    }).catch(e => alert('風速 失敗:' + e)).finally(() => loading.style.display = 'none');
+                    return;
+                }
+                fetch(`${endpoint}?var=${p.var}&year=${p.year}&month=${p.month}&day=${p.day}&hour=${p.hour}`)
+                    .then(r => r.json())
+                    .then(data => addLayerToMap(data, labelTpl.replace('{var}', p.var).replace('{year}', p.year).replace('{month}', p.month).replace('{day}', p.day).replace('{hour}', p.hour)))
+                    .catch(e => alert(id + ' 失敗:' + e))
+                    .finally(() => loading.style.display = 'none');
+            };
+        }
+        bindButton('showCoarseBtn', '/coarse', '{var} 原始 (0.25°) @ {year}-{month}-{day} {hour}', '讀取資料中…');
+        bindButton('showDownBtn', '/downscale', '{var} 降尺度 (0.02°) @ {year}-{month}-{day} {hour}', '正在運行模型，請稍候…');
+        bindButton('showFineBtn', '/fine', '{var} 細網格 @ {year}-{month}-{day} {hour}', '讀取資料中…');
+    </script>
+
+</body>
+
+</html>

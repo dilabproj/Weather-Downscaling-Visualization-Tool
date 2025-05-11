@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet 高亮範圍</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        #map {
+            height: 1000px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>高亮台灣特定區域</h1>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 初始化地圖
+        const map = L.map('map').setView([23.6978, 120.9605], 8);
+
+        // 添加地圖圖層
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 定義台灣的目標區域 (四角座標)
+        const targetBounds = [
+            [21.625, 118.875], // 左下角 (南西)
+            [25.625, 122.875]  // 右上角 (北東)
+        ];
+
+        // 創建整個地圖的覆蓋遮罩 (包含整個地圖範圍)
+        const outsideMask = [
+            [[-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]], // 地圖全覆蓋
+            [
+                [targetBounds[0][0], targetBounds[0][1]], // 左下角
+                [targetBounds[1][0], targetBounds[0][1]], // 左上角
+                [targetBounds[1][0], targetBounds[1][1]], // 右上角
+                [targetBounds[0][0], targetBounds[1][1]], // 右下角
+                [targetBounds[0][0], targetBounds[0][1]]  // 回到左下角
+            ]
+        ];
+
+        // 添加遮罩 (灰色區域)
+        L.polygon(outsideMask, {
+            color: '#000000',          // 邊框顏色
+            fillColor: '#000000',      // 填充顏色
+            fillOpacity: 0.5,          // 填充透明度
+            weight: 1                  // 邊框寬度
+        }).addTo(map);
+
+        // 在範圍內添加矩形邊界作為參考
+        L.rectangle(targetBounds, {
+            color: "#ff7800",          // 邊框顏色 (橙色)
+            weight: 2                  // 邊框寬度
+        }).addTo(map).bindPopup("高亮範圍");
+    </script>
+</body>
+
+</html>
