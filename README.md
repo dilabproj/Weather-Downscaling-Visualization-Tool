@@ -4,7 +4,7 @@
 
 ---
 
-## 功能特色
+## 功能
 
 - **降尺度模組**  
   - `modules/downscaling_wind.py`：風場降尺度  
@@ -17,7 +17,7 @@
 - **Web API**  
   - `app.py`：Flask 主程式  
   - `rain_route.py`：降水專用 API 
-  - `wsgi.py`：WSGI 介面，用於生產環境部署
+  - `wsgi.py`：WSGI 介面，用於環境部署
 
 - **前端資源**  
   - `templates/`：HTML 模板  
