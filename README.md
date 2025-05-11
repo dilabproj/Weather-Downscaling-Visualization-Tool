@@ -28,18 +28,18 @@
 ## 安裝步驟
 
 1. Clone 本專案：
-   ```bash
-   git clone https://github.com/dilabproj/Weather-Downscaling-Visualization-Tool.git
-   cd Weather-Downscaling-Visualization-Tool/flask_app
-   ```
+```bash
+git clone https://github.com/dilabproj/Weather-Downscaling-Visualization-Tool.git
+cd Weather-Downscaling-Visualization-Tool/flask_app
+```
 2. 建立並啟動虛擬環境：
-  ```bash
-  python3 -m venv venv
-  source venv/bin/activate   # Windows: venv\Scripts\activate
-  ```
+```bash
+python3 -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+```
 3. 安裝套件：
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
 
