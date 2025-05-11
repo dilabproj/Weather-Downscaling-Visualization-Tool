@@ -42,7 +42,7 @@
   python3 -m venv venv
   source venv/bin/activate   # Windows: venv\Scripts\activate
   ```
-3. 安裝相依套件：
+3. 安裝套件：
    ```bash
    pip install -r requirements.txt
    ```
