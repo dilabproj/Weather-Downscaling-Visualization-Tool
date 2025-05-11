@@ -1,0 +1,182 @@
+/* style.css */
+
+
+/* 總容器：將兩個區塊並排，邊框/背景等可自行調整 */
+.mode-switcher {
+    display: flex;
+    border: 1px solid #ffffff88;
+    /* 淡色邊框，可自行調 */
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* 單個區塊 (按鈕)，讓它可以平分 mode-switcher */
+.mode-btn {
+    flex: 1;
+    /* 平分空間 */
+    padding: 8px 0;
+    /* 上下左右內距，可自行調 */
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    background: #2a77af;
+    /* 與你的 navbar 色系吻合 */
+    color: #fff;
+    transition: background 0.2s;
+}
+
+/* 被點選 (active) 的按鈕外觀，如背景/文字顏色等 */
+.mode-btn.active {
+    background: #fff;
+    color: #2a77af;
+}
+
+/* 全域背景 & 字體 */
+body {
+    margin: 0;
+    font-family: 'Noto Sans', sans-serif;
+    background: linear-gradient(to bottom, #e0f1ff 0%, #f7fbff 100%);
+    color: #333;
+}
+
+/* 頂部導覽列 */
+.navbar {
+    background: #2a77af;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.navbar h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.navbar .nav-right {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* 主容器: 地圖全屏 */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+    /* navbar ~50px */
+}
+
+/* 地圖 */
+#map {
+    flex: 1;
+    width: 100%;
+}
+
+/* 控制卡片 */
+.control-panel {
+    position: absolute;
+    top: 70px;
+    left: 20px;
+    background: #ffffffcc;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    z-index: 999;
+    max-width: 300px;
+}
+
+.control-panel h2 {
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2a77af;
+}
+
+.control-panel select,
+.control-panel button {
+    margin-right: 5px;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.control-panel button {
+    background: #2a77af;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.control-panel button:hover {
+    background: #1f5f8a;
+}
+
+/* 彩色漸層色條 */
+.colorbar {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.colorbar-title {
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.colorbar-gradient {
+    width: 200px;
+    height: 16px;
+    margin-bottom: 4px;
+}
+
+.colorbar-labels {
+    width: 200px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+}
+
+/* Leaflet 圖例 (info legend) */
+.info.legend {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.info.legend h4 {
+    margin: 0 0 5px 0;
+    font-size: 1rem;
+}
+
+/* Leaflet 比例尺: 白底黑邊 */
+.leaflet-control-scale-line {
+    background-color: #fff;
+    border: 2px solid #000;
+    color: #000;
+    border-radius: 2px;
+    padding: 2px 5px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
