@@ -1,6 +1,8 @@
 # Weather Downscaling Visualization Tool
 
 一個基於 Flask + Leaflet 的氣象降尺度可視化網頁工具，可對原始風場與降水資料進行降尺度處理，並將結果顯示在互動式地圖上。
+![image](https://github.com/user-attachments/assets/9c379d2c-c179-4478-b7b6-fe992f6f7511)
+
 
 ---
 
@@ -41,5 +43,5 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
-
+4. 後續只需接上模型與資料集即可使用
 
